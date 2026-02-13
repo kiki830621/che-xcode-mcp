@@ -15,11 +15,38 @@ class CheXcodeMCPServer {
 
         // Initialize all managers
         let testFlight = TestFlightManager(client: ascClient)
-        // TODO: Add remaining 15 managers as they are implemented
+        let app = AppManager(client: ascClient)
+        let review = ReviewManager(client: ascClient)
+        let users = UsersManager(client: ascClient)
+        let metadata = MetadataManager(client: ascClient)
+        let subscription = SubscriptionManager(client: ascClient)
+        let provisioning = ProvisioningManager(client: ascClient)
+        let pricing = PricingManager(client: ascClient)
+        let iap = IAPManager(client: ascClient)
+        let analytics = AnalyticsManager(client: ascClient)
+        let finance = FinanceManager(client: ascClient)
+        let performance = PerformanceManager(client: ascClient)
+        let xcodeCloud = XcodeCloudManager(client: ascClient)
+        let gameCenter = GameCenterManager(client: ascClient)
+        let appClips = AppClipsManager(client: ascClient)
 
         // Register providers with their prefix
         providers = [
             "testflight": testFlight,
+            "app": app,
+            "review": review,
+            "users": users,
+            "metadata": metadata,
+            "subscription": subscription,
+            "provisioning": provisioning,
+            "pricing": pricing,
+            "iap": iap,
+            "analytics": analytics,
+            "finance": finance,
+            "performance": performance,
+            "ci": xcodeCloud,
+            "gamecenter": gameCenter,
+            "appclip": appClips,
         ]
 
         // Collect all tools from all providers

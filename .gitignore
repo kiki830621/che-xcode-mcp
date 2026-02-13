@@ -4,3 +4,5 @@ Package.resolved
 *.xcodeproj
 *.xcworkspace
 DerivedData/
+mcpb/server/
+mcpb/*.mcpb

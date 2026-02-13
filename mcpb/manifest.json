@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "che-xcode-mcp",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Comprehensive App Store Connect MCP Server — TestFlight, analytics, builds, provisioning, and more",
   "author": {
     "name": "Che Cheng"
