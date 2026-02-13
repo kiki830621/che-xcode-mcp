@@ -1,0 +1,29 @@
+{
+  "manifest_version": "0.3",
+  "name": "che-xcode-mcp",
+  "version": "0.1.0",
+  "description": "Comprehensive App Store Connect MCP Server — TestFlight, analytics, builds, provisioning, and more",
+  "author": {
+    "name": "Che Cheng"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/kiki830621/che-xcode-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kiki830621/che-xcode-mcp"
+  },
+  "server": {
+    "type": "binary",
+    "entry_point": "server/CheXcodeMCP",
+    "mcp_config": {
+      "command": "$DIRNAME/server/CheXcodeMCP",
+      "args": [],
+      "env": {
+        "ASC_KEY_ID": "",
+        "ASC_ISSUER_ID": "",
+        "ASC_PRIVATE_KEY_PATH": ""
+      }
+    }
+  },
+  "keywords": ["app-store-connect", "testflight", "xcode", "ios", "apple"]
+}
