@@ -29,6 +29,7 @@ class CheXcodeMCPServer {
         let xcodeCloud = XcodeCloudManager(client: ascClient)
         let gameCenter = GameCenterManager(client: ascClient)
         let appClips = AppClipsManager(client: ascClient)
+        let organizerCrash = OrganizerCrashManager()
 
         // Register providers with their prefix
         providers = [
@@ -47,6 +48,7 @@ class CheXcodeMCPServer {
             "ci": xcodeCloud,
             "gamecenter": gameCenter,
             "appclip": appClips,
+            "organizer": organizerCrash,
         ]
 
         // Collect all tools from all providers
@@ -116,6 +118,7 @@ class CheXcodeMCPServer {
     | `ci_` | Xcode Cloud | CI products, workflows, build runs |
     | `gamecenter_` | Game Center | Leaderboards, achievements |
     | `appclip_` | App Clips | Clips, default experiences |
+    | `organizer_` | Xcode Organizer crashes | Symbolicated crash logs from local Xcode cache (no API needed) |
 
     ## Critical Distinctions
 
@@ -140,6 +143,18 @@ class CheXcodeMCPServer {
     2. `analytics_list_reports` — Check report status
     3. `analytics_list_instances` — Get generated report instances (by date/granularity)
     4. `analytics_list_segments` — Get downloadable URLs for report data
+
+    ## Crash Data — Two Different Sources
+
+    | Data | Tool | Source |
+    |------|------|--------|
+    | Symbolicated crash backtraces | `organizer_list_crashes`, `organizer_get_crash_log` | Xcode Organizer local cache |
+    | Crash statistics (version/OS/device) | `organizer_get_crash_stats` | Xcode Organizer local cache |
+    | Disk writes & hangs signatures | `performance_list_diagnostic_signatures` | ASC REST API (needs build_id) |
+    | TestFlight user-reported crashes | `testflight_list_crash_feedback` | ASC REST API (needs app_id) |
+
+    **Important**: The ASC REST API does NOT expose crash backtraces. Use `organizer_` tools for crash analysis.
+    Xcode Organizer must have been opened at least once to populate the local cache.
 
     ## Parameter Notes
 

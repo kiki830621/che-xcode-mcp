@@ -64,13 +64,13 @@ actor PerformanceManager: ToolProvider {
             ),
             Tool(
                 name: "performance_list_diagnostic_signatures",
-                description: "List diagnostic signatures (crash groups) for an app. Signatures group similar diagnostic events together.",
+                description: "List diagnostic signatures (crash/hang/disk-write groups) for a specific build. Signatures group similar diagnostic events together. Requires a build UUID from testflight_list_builds, NOT an app ID.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([
-                        "app_id": .object([
+                        "build_id": .object([
                             "type": "string",
-                            "description": "App Store Connect app ID (required)"
+                            "description": "App Store Connect build UUID (required). Get this from testflight_list_builds → each build's 'id' field."
                         ]),
                         "diagnostic_type": .object([
                             "type": "string",
@@ -81,7 +81,7 @@ actor PerformanceManager: ToolProvider {
                             "description": "Maximum number of signatures to return (default 20, max 200)"
                         ])
                     ]),
-                    "required": .array([.string("app_id")])
+                    "required": .array([.string("build_id")])
                 ]),
                 annotations: .init(readOnlyHint: true)
             ),
@@ -185,7 +185,7 @@ actor PerformanceManager: ToolProvider {
     // MARK: - Handler: List Diagnostic Signatures
 
     private func handleListDiagnosticSignatures(_ args: [String: Value]) async throws -> String {
-        let appId = try requireString(args, "app_id")
+        let buildId = try requireString(args, "build_id")
 
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "fields[diagnosticSignatures]", value: "diagnosticType,signature,weight,insight"),
@@ -198,15 +198,15 @@ actor PerformanceManager: ToolProvider {
         queryItems.append(URLQueryItem(name: "limit", value: String(min(limit, 200))))
 
         let response: ASCListResponse<DiagnosticSignature> = try await client.getList(
-            path: "/v1/apps/\(appId)/diagnosticSignatures",
+            path: "/v1/builds/\(buildId)/diagnosticSignatures",
             queryItems: queryItems
         )
 
         if response.data.isEmpty {
-            return "No diagnostic signatures found for app \(appId)."
+            return "No diagnostic signatures found for build \(buildId)."
         }
 
-        var lines = ["Diagnostic Signatures for app \(appId) (\(response.data.count)):"]
+        var lines = ["Diagnostic Signatures for build \(buildId) (\(response.data.count)):"]
         lines.append(String(repeating: "-", count: 60))
         for signature in response.data {
             lines.append(formatDiagnosticSignature(signature))
@@ -215,6 +215,8 @@ actor PerformanceManager: ToolProvider {
         if let paging = response.meta?.paging, let total = paging.total {
             lines.append("\nShowing \(response.data.count) of \(total) total signatures.")
         }
+
+        lines.append("\nTip: Use performance_get_diagnostic_signature with a signature ID for details, or performance_list_diagnostic_logs for individual events.")
 
         return lines.joined(separator: "\n")
     }

@@ -1,6 +1,6 @@
 # che-xcode-mcp
 
-Comprehensive App Store Connect MCP Server — 99 tools across 15 domain managers covering the full ASC API.
+Comprehensive App Store Connect MCP Server — 103 tools across 16 domain managers covering the full ASC API + Xcode Organizer crash logs.
 
 ## Features
 
@@ -21,6 +21,7 @@ Comprehensive App Store Connect MCP Server — 99 tools across 15 domain manager
 | Xcode Cloud | 6 | CI products, workflows, build runs |
 | Game Center | 5 | Leaderboards, achievements |
 | App Clips | 5 | App Clips and default experiences |
+| Organizer Crashes | 3 | Symbolicated crash logs from Xcode Organizer local cache |
 
 ## Installation
 
@@ -68,7 +69,7 @@ Add to `~/.claude/settings.json`:
 
 ## Technical Details
 
-- **Version**: 0.0.2
+- **Version**: 0.1.0
 - **Platform**: macOS 14.0+
 - **Language**: Swift 5.9
 - **MCP SDK**: [swift-sdk](https://github.com/modelcontextprotocol/swift-sdk) 0.10.x
@@ -79,6 +80,7 @@ Add to `~/.claude/settings.json`:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.1.0 | 2026-02-14 | Add Xcode Organizer crash log tools, fix diagnosticSignatures endpoint |
 | 0.0.2 | 2026-02-14 | Fix TestFlight feedback endpoint, add crash feedback tool, server instructions for AI agents |
 | 0.0.1 | 2026-02-13 | Initial release — 15 managers, 99 tools, full ASC API coverage |
 

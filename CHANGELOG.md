@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.0] - 2026-02-14
+
+### Added
+- `organizer_list_crashes` — list crash signatures from Xcode Organizer's local cache (no ASC API needed)
+- `organizer_get_crash_log` — read full symbolicated crash backtraces from Xcode Organizer cache
+- `organizer_get_crash_stats` — get crash statistics (version/OS/device/distribution breakdown)
+- Server instructions: added `organizer_` tool category and crash data source documentation
+- Tool count: 100 → 103
+
+### Fixed
+- `performance_list_diagnostic_signatures` — was using non-existent `/v1/apps/{id}/diagnosticSignatures` (404). Fixed to correct endpoint `/v1/builds/{id}/diagnosticSignatures`. Parameter changed from `app_id` to `build_id`.
+
+### Changed
+- `performance_list_diagnostic_signatures` now requires `build_id` (was `app_id`). Get build UUIDs from `testflight_list_builds`.
+
 ## [0.0.2] - 2026-02-14
 
 ### Fixed
