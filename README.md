@@ -68,7 +68,7 @@ Add to `~/.claude/settings.json`:
 
 ## Technical Details
 
-- **Version**: 1.0.0
+- **Version**: 0.0.2
 - **Platform**: macOS 14.0+
 - **Language**: Swift 5.9
 - **MCP SDK**: [swift-sdk](https://github.com/modelcontextprotocol/swift-sdk) 0.10.x
@@ -79,7 +79,8 @@ Add to `~/.claude/settings.json`:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0 | 2026-02-13 | Initial release — 15 managers, 99 tools, full ASC API coverage |
+| 0.0.2 | 2026-02-14 | Fix TestFlight feedback endpoint, add crash feedback tool, server instructions for AI agents |
+| 0.0.1 | 2026-02-13 | Initial release — 15 managers, 99 tools, full ASC API coverage |
 
 ## License
 

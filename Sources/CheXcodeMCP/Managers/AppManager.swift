@@ -38,7 +38,7 @@ actor AppManager: ToolProvider {
         [
             Tool(
                 name: "app_list_apps",
-                description: "List all apps in App Store Connect. Optionally limit the number of results.",
+                description: "List all apps in your App Store Connect account. Returns app IDs, names, bundle IDs, and SKUs. App IDs from results are used as app_id in most other tools (testflight_, metadata_, review_, analytics_, etc.). Start here if you don't know the app_id.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([

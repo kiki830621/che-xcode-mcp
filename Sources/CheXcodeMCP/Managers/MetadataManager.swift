@@ -51,7 +51,7 @@ actor MetadataManager: ToolProvider {
         [
             Tool(
                 name: "metadata_list_versions",
-                description: "List App Store versions for an app. Shows version string, platform, and review state.",
+                description: "List App Store versions (e.g., v1.0, v1.1) for an app. Returns version UUIDs, version strings, platform, and review state. Use version UUIDs as version_id in metadata_get_version, metadata_update_version, review_submit_for_review. Note: these are App Store release versions, NOT TestFlight builds.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([

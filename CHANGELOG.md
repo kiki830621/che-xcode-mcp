@@ -1,6 +1,20 @@
 # Changelog
 
-## [1.0.0] - 2026-02-13
+## [0.0.2] - 2026-02-14
+
+### Fixed
+- Fix `testflight_list_feedback` — was using non-existent `/v1/builds/{id}/betaAppReviewSubmissions` endpoint (404 error). Replaced with correct `/v1/apps/{id}/betaFeedbackScreenshotSubmissions` endpoint (WWDC25 new API)
+
+### Added
+- `testflight_list_crash_feedback` — new tool for crash feedback from beta testers via `/v1/apps/{id}/betaFeedbackCrashSubmissions`
+- Server-level `instructions` — comprehensive AI agent guide covering ID types, tool categories, critical distinctions (review vs feedback), and multi-step workflows
+- Improved tool descriptions across TestFlight, Review, Analytics, Metadata, and App managers with cross-references and disambiguation
+
+### Changed
+- `testflight_list_feedback` now requires `app_id` (was `build_id`) — feedback is an app-level resource, optional `build_id` filter added
+- Tool count: 99 → 100 (added `testflight_list_crash_feedback`)
+
+## [0.0.1] - 2026-02-13
 
 ### Added
 - Initial release with 15 domain managers covering the full App Store Connect API

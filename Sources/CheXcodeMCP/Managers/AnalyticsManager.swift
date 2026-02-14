@@ -40,7 +40,7 @@ actor AnalyticsManager: ToolProvider {
         [
             Tool(
                 name: "analytics_request_report",
-                description: "Request an analytics report for an app. Creates a new report request with the specified access type.",
+                description: "Step 1 of 4: Request an analytics report for an app. Creates a new report request. After requesting, use analytics_list_reports to check status, then analytics_list_instances → analytics_list_segments to get downloadable data.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([
@@ -59,7 +59,7 @@ actor AnalyticsManager: ToolProvider {
             ),
             Tool(
                 name: "analytics_list_reports",
-                description: "List analytics report requests for an app.",
+                description: "Step 2 of 4: List existing analytics report requests for an app. Shows request UUIDs, access type, and whether they stopped due to inactivity. Use a report_request_id from results in analytics_list_instances.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([
@@ -78,7 +78,7 @@ actor AnalyticsManager: ToolProvider {
             ),
             Tool(
                 name: "analytics_get_report",
-                description: "Get the status of a specific analytics report request.",
+                description: "Get status of a specific analytics report request by its UUID. Use report_request_id from analytics_list_reports.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([
@@ -93,7 +93,7 @@ actor AnalyticsManager: ToolProvider {
             ),
             Tool(
                 name: "analytics_list_instances",
-                description: "List report instances (the actual generated reports) for a report request. Optionally filter by granularity or processing date.",
+                description: "Step 3 of 4: List generated report instances for a report request. Each instance represents data for a specific date/granularity. Use instance_id from results in analytics_list_segments to get download URLs.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([
@@ -120,7 +120,7 @@ actor AnalyticsManager: ToolProvider {
             ),
             Tool(
                 name: "analytics_list_segments",
-                description: "List segments for a report instance. Each segment contains a downloadable URL.",
+                description: "Step 4 of 4: List downloadable data segments for a report instance. Each segment has a URL to download the actual analytics data (CSV). Use instance_id from analytics_list_instances.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([

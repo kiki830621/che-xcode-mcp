@@ -39,6 +39,38 @@ struct BetaAppReviewSubmissionAttributes: Decodable {
     let submittedDate: Date?
 }
 
+struct BetaFeedbackScreenshotImage: Decodable {
+    let url: String?
+    let width: Int?
+    let height: Int?
+    let expirationDate: Date?
+}
+
+struct BetaFeedbackScreenshotAttributes: Decodable {
+    let createdDate: Date?
+    let comment: String?
+    let email: String?
+    let deviceModel: String?
+    let osVersion: String?
+    let locale: String?
+    let deviceFamily: String?
+    let appPlatform: String?
+    let batteryPercentage: Int?
+    let screenshots: [BetaFeedbackScreenshotImage]?
+}
+
+struct BetaFeedbackCrashAttributes: Decodable {
+    let createdDate: Date?
+    let comment: String?
+    let email: String?
+    let deviceModel: String?
+    let osVersion: String?
+    let locale: String?
+    let deviceFamily: String?
+    let appPlatform: String?
+    let batteryPercentage: Int?
+}
+
 // MARK: - Type aliases
 
 private typealias Build = ASCResource<BuildAttributes>
@@ -46,6 +78,8 @@ private typealias BetaTester = ASCResource<BetaTesterAttributes>
 private typealias BetaGroup = ASCResource<BetaGroupAttributes>
 private typealias BetaBuildLocalization = ASCResource<BetaBuildLocalizationAttributes>
 private typealias BetaAppReviewSubmission = ASCResource<BetaAppReviewSubmissionAttributes>
+private typealias BetaFeedbackScreenshot = ASCResource<BetaFeedbackScreenshotAttributes>
+private typealias BetaFeedbackCrash = ASCResource<BetaFeedbackCrashAttributes>
 
 // MARK: - TestFlightManager
 
@@ -62,7 +96,7 @@ actor TestFlightManager: ToolProvider {
         [
             Tool(
                 name: "testflight_list_builds",
-                description: "List TestFlight builds. Optionally filter by app_id and processing_state.",
+                description: "List TestFlight builds (uploaded binaries). Returns build UUIDs, version numbers, processing state, and upload dates. Use build UUIDs from results as build_id in other tools.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([
@@ -99,7 +133,7 @@ actor TestFlightManager: ToolProvider {
             ),
             Tool(
                 name: "testflight_list_testers",
-                description: "List beta testers. Optionally filter by email or beta group.",
+                description: "List TestFlight beta testers. Returns tester UUIDs, names, emails, and invite status. Provide group_id to list testers in a specific beta group, or omit to list all testers.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([
@@ -167,7 +201,7 @@ actor TestFlightManager: ToolProvider {
             ),
             Tool(
                 name: "testflight_list_groups",
-                description: "List beta groups. Optionally filter by app_id or internal/external type.",
+                description: "List TestFlight beta groups (internal and external). Returns group UUIDs, names, type (internal/external), and whether feedback is enabled. Use group UUIDs as group_id in tester tools.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([
@@ -189,22 +223,53 @@ actor TestFlightManager: ToolProvider {
             ),
             Tool(
                 name: "testflight_list_feedback",
-                description: "List beta app review submissions (feedback) for a specific build.",
+                description: "List screenshot feedback from beta testers for an app. Returns tester comments, device info, and screenshot URLs.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([
+                        "app_id": .object([
+                            "type": "string",
+                            "description": "App Store Connect app ID (required)"
+                        ]),
                         "build_id": .object([
                             "type": "string",
-                            "description": "The build ID to get feedback for"
+                            "description": "Filter feedback to a specific build ID"
+                        ]),
+                        "limit": .object([
+                            "type": "integer",
+                            "description": "Maximum number of feedback items to return (default 25, max 200)"
                         ])
                     ]),
-                    "required": .array([.string("build_id")])
+                    "required": .array([.string("app_id")])
+                ]),
+                annotations: .init(readOnlyHint: true)
+            ),
+            Tool(
+                name: "testflight_list_crash_feedback",
+                description: "List crash feedback from beta testers for an app. Returns tester comments about crashes and device info.",
+                inputSchema: .object([
+                    "type": "object",
+                    "properties": .object([
+                        "app_id": .object([
+                            "type": "string",
+                            "description": "App Store Connect app ID (required)"
+                        ]),
+                        "build_id": .object([
+                            "type": "string",
+                            "description": "Filter crash feedback to a specific build ID"
+                        ]),
+                        "limit": .object([
+                            "type": "integer",
+                            "description": "Maximum number of crash feedback items to return (default 25, max 200)"
+                        ])
+                    ]),
+                    "required": .array([.string("app_id")])
                 ]),
                 annotations: .init(readOnlyHint: true)
             ),
             Tool(
                 name: "testflight_submit_for_review",
-                description: "Submit a build for external beta testing review.",
+                description: "Submit a build to Apple for external beta testing review (required before external testers can access). NOT for App Store release — use review_submit_for_review for App Store submission.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([
@@ -258,6 +323,8 @@ actor TestFlightManager: ToolProvider {
             return try await handleListGroups(arguments)
         case "testflight_list_feedback":
             return try await handleListFeedback(arguments)
+        case "testflight_list_crash_feedback":
+            return try await handleListCrashFeedback(arguments)
         case "testflight_submit_for_review":
             return try await handleSubmitForReview(arguments)
         case "testflight_set_whats_new":
@@ -481,23 +548,68 @@ actor TestFlightManager: ToolProvider {
         return lines.joined(separator: "\n")
     }
 
-    // MARK: - Handler: List Feedback
+    // MARK: - Handler: List Feedback (Screenshot)
 
     private func handleListFeedback(_ args: [String: Value]) async throws -> String {
-        let buildId = try requireString(args, "build_id")
+        let appId = try requireString(args, "app_id")
+        let limit = intValue(args, "limit") ?? 25
 
-        let response: ASCListResponse<BetaAppReviewSubmission> = try await client.getList(
-            path: "/v1/builds/\(buildId)/betaAppReviewSubmissions"
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "fields[betaFeedbackScreenshotSubmissions]", value: "createdDate,comment,email,deviceModel,osVersion,locale,deviceFamily,appPlatform,batteryPercentage,screenshots"),
+            URLQueryItem(name: "sort", value: "-createdDate"),
+            URLQueryItem(name: "limit", value: String(min(limit, 200))),
+        ]
+
+        if let buildId = stringValue(args, "build_id") {
+            queryItems.append(URLQueryItem(name: "filter[build]", value: buildId))
+        }
+
+        let response: ASCListResponse<BetaFeedbackScreenshot> = try await client.getList(
+            path: "/v1/apps/\(appId)/betaFeedbackScreenshotSubmissions",
+            queryItems: queryItems
         )
 
         if response.data.isEmpty {
-            return "No beta review submissions found for build \(buildId)."
+            return "No screenshot feedback found for app \(appId)."
         }
 
-        var lines = ["Beta Review Submissions for build \(buildId) (\(response.data.count)):"]
+        var lines = ["Screenshot Feedback (\(response.data.count)):"]
         lines.append(String(repeating: "-", count: 60))
-        for submission in response.data {
-            lines.append(formatReviewSubmission(submission))
+        for feedback in response.data {
+            lines.append(formatScreenshotFeedback(feedback))
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    // MARK: - Handler: List Crash Feedback
+
+    private func handleListCrashFeedback(_ args: [String: Value]) async throws -> String {
+        let appId = try requireString(args, "app_id")
+        let limit = intValue(args, "limit") ?? 25
+
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "fields[betaFeedbackCrashSubmissions]", value: "createdDate,comment,email,deviceModel,osVersion,locale,deviceFamily,appPlatform,batteryPercentage"),
+            URLQueryItem(name: "sort", value: "-createdDate"),
+            URLQueryItem(name: "limit", value: String(min(limit, 200))),
+        ]
+
+        if let buildId = stringValue(args, "build_id") {
+            queryItems.append(URLQueryItem(name: "filter[build]", value: buildId))
+        }
+
+        let response: ASCListResponse<BetaFeedbackCrash> = try await client.getList(
+            path: "/v1/apps/\(appId)/betaFeedbackCrashSubmissions",
+            queryItems: queryItems
+        )
+
+        if response.data.isEmpty {
+            return "No crash feedback found for app \(appId)."
+        }
+
+        var lines = ["Crash Feedback (\(response.data.count)):"]
+        lines.append(String(repeating: "-", count: 60))
+        for feedback in response.data {
+            lines.append(formatCrashFeedback(feedback))
         }
         return lines.joined(separator: "\n")
     }
@@ -666,5 +778,48 @@ actor TestFlightManager: ToolProvider {
         let state = attrs?.betaReviewState ?? "UNKNOWN"
         let submitted = formatDate(attrs?.submittedDate)
         return "  [\(submission.id)] State: \(state) | Submitted: \(submitted)"
+    }
+
+    private func formatScreenshotFeedback(_ feedback: BetaFeedbackScreenshot) -> String {
+        let attrs = feedback.attributes
+        let date = formatDate(attrs?.createdDate)
+        let email = attrs?.email ?? "Unknown"
+        let device = attrs?.deviceModel ?? "?"
+        let os = attrs?.osVersion ?? "?"
+        let comment = attrs?.comment ?? "(no comment)"
+        let screenshotCount = attrs?.screenshots?.count ?? 0
+
+        var lines = [
+            "  [\(feedback.id)]",
+            "    From: \(email) | \(date)",
+            "    Device: \(device) (\(os))",
+            "    Comment: \(comment)",
+        ]
+        if screenshotCount > 0 {
+            lines.append("    Screenshots: \(screenshotCount)")
+            for (i, ss) in (attrs?.screenshots ?? []).enumerated() {
+                if let url = ss.url {
+                    let size = [ss.width, ss.height].compactMap { $0 }.map(String.init).joined(separator: "x")
+                    lines.append("      [\(i + 1)] \(url)\(size.isEmpty ? "" : " (\(size))")")
+                }
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private func formatCrashFeedback(_ feedback: BetaFeedbackCrash) -> String {
+        let attrs = feedback.attributes
+        let date = formatDate(attrs?.createdDate)
+        let email = attrs?.email ?? "Unknown"
+        let device = attrs?.deviceModel ?? "?"
+        let os = attrs?.osVersion ?? "?"
+        let comment = attrs?.comment ?? "(no comment)"
+
+        return [
+            "  [\(feedback.id)]",
+            "    From: \(email) | \(date)",
+            "    Device: \(device) (\(os))",
+            "    Comment: \(comment)",
+        ].joined(separator: "\n")
     }
 }

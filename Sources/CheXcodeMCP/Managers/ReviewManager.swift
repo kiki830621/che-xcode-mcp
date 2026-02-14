@@ -43,7 +43,7 @@ actor ReviewManager: ToolProvider {
         [
             Tool(
                 name: "review_list_customer_reviews",
-                description: "List customer reviews for an app. Optionally filter by star rating and sort order.",
+                description: "List App Store customer reviews (public ratings/reviews from end users who downloaded your app). NOT TestFlight feedback — use testflight_list_feedback for beta tester feedback instead.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([
@@ -70,7 +70,7 @@ actor ReviewManager: ToolProvider {
             ),
             Tool(
                 name: "review_get_customer_review",
-                description: "Get a specific customer review by ID.",
+                description: "Get a specific App Store customer review by its review UUID. Get review IDs from review_list_customer_reviews.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([
@@ -138,7 +138,7 @@ actor ReviewManager: ToolProvider {
             ),
             Tool(
                 name: "review_submit_for_review",
-                description: "Submit an app store version for App Store review.",
+                description: "Submit an App Store version for Apple's App Store review (for public release). Requires a version_id from metadata_list_versions. NOT for TestFlight — use testflight_submit_for_review to submit a build for external beta review.",
                 inputSchema: .object([
                     "type": "object",
                     "properties": .object([
