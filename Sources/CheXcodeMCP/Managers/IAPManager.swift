@@ -184,7 +184,7 @@ actor IAPManager: ToolProvider {
         let appId = try requireString(args, "app_id")
 
         var queryItems: [URLQueryItem] = [
-            URLQueryItem(name: "fields[inAppPurchasesV2]", value: "name,productId,inAppPurchaseType,state,reviewNote,contentHosting"),
+            URLQueryItem(name: "fields[inAppPurchases]", value: "name,productId,inAppPurchaseType,state,reviewNote,contentHosting"),
         ]
 
         if let iapType = stringValue(args, "iap_type") {
@@ -221,7 +221,7 @@ actor IAPManager: ToolProvider {
         let iapId = try requireString(args, "iap_id")
 
         let queryItems = [
-            URLQueryItem(name: "fields[inAppPurchasesV2]", value: "name,productId,inAppPurchaseType,state,reviewNote,contentHosting")
+            URLQueryItem(name: "fields[inAppPurchases]", value: "name,productId,inAppPurchaseType,state,reviewNote,contentHosting")
         ]
 
         let response: ASCResponse<InAppPurchaseV2> = try await client.get(

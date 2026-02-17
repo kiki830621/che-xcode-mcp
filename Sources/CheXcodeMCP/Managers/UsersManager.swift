@@ -195,7 +195,7 @@ actor UsersManager: ToolProvider {
 
     private func handleListUsers(_ args: [String: Value]) async throws -> String {
         var queryItems: [URLQueryItem] = [
-            URLQueryItem(name: "fields[users]", value: "username,firstName,lastName,email,roles,allAppsVisible,provisioningAllowed"),
+            URLQueryItem(name: "fields[users]", value: "username,firstName,lastName,roles,allAppsVisible,provisioningAllowed"),
             URLQueryItem(name: "sort", value: "lastName"),
         ]
 
@@ -234,7 +234,7 @@ actor UsersManager: ToolProvider {
         let userId = try requireString(args, "user_id")
 
         let queryItems = [
-            URLQueryItem(name: "fields[users]", value: "username,firstName,lastName,email,roles,allAppsVisible,provisioningAllowed")
+            URLQueryItem(name: "fields[users]", value: "username,firstName,lastName,roles,allAppsVisible,provisioningAllowed")
         ]
 
         let response: ASCResponse<User> = try await client.get(
@@ -288,7 +288,7 @@ actor UsersManager: ToolProvider {
     private func handleListInvitations(_ args: [String: Value]) async throws -> String {
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "fields[userInvitations]", value: "email,firstName,lastName,roles,allAppsVisible,expirationDate"),
-            URLQueryItem(name: "sort", value: "-expirationDate"),
+            URLQueryItem(name: "sort", value: "email"),
         ]
 
         let limit = intValue(args, "limit") ?? 50

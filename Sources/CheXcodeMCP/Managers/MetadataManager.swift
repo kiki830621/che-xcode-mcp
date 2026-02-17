@@ -241,7 +241,6 @@ actor MetadataManager: ToolProvider {
 
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "fields[appStoreVersions]", value: "versionString,platform,appStoreState,copyright,releaseType,earliestReleaseDate,createdDate"),
-            URLQueryItem(name: "sort", value: "-createdDate"),
         ]
 
         if let platform = stringValue(args, "platform") {

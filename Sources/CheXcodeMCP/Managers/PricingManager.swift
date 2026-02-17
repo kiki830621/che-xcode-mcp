@@ -10,7 +10,6 @@ struct TerritoryAttributes: Decodable {
 struct AppPricePointAttributes: Decodable {
     let customerPrice: String?
     let proceeds: String?
-    let priceTier: String?
 }
 
 struct AppPriceScheduleAttributes: Decodable {
@@ -127,7 +126,6 @@ actor PricingManager: ToolProvider {
     private func handleListTerritories(_ args: [String: Value]) async throws -> String {
         let limit = intValue(args, "limit") ?? 200
         let queryItems = [
-            URLQueryItem(name: "fields[territories]", value: "currency"),
             URLQueryItem(name: "limit", value: String(min(limit, 200))),
         ]
 
@@ -147,7 +145,8 @@ actor PricingManager: ToolProvider {
         let columns = 4
         let entries = response.data.map { territory -> String in
             let currency = territory.attributes?.currency ?? "---"
-            return String(format: "%-5s (%@)", territory.id as NSString, currency)
+            let paddedId = territory.id.padding(toLength: 5, withPad: " ", startingAt: 0)
+            return "\(paddedId) (\(currency))"
         }
 
         var row: [String] = []
@@ -173,7 +172,7 @@ actor PricingManager: ToolProvider {
         let appId = try requireString(args, "app_id")
 
         let queryItems = [
-            URLQueryItem(name: "include", value: "appPrices"),
+            URLQueryItem(name: "include", value: "manualPrices,automaticPrices,baseTerritory"),
         ]
 
         let response: ASCResponse<AppPriceSchedule> = try await client.get(
@@ -188,27 +187,39 @@ actor PricingManager: ToolProvider {
             "  Schedule ID: \(response.data.id)",
         ]
 
-        // Show included price resources if available
+        // Show included resources (manual prices, automatic prices, base territory)
         if let included = response.included, !included.isEmpty {
-            lines.append("")
-            lines.append("  Included Prices (\(included.count)):")
-            lines.append("  " + String(repeating: "-", count: 40))
-            for resource in included {
-                let price = resource.attributes?["customerPrice"]?.value as? String ?? "N/A"
-                let proceeds = resource.attributes?["proceeds"]?.value as? String ?? "N/A"
-                lines.append("    [\(resource.id)] Price: \(price) | Proceeds: \(proceeds)")
+            let territories = included.filter { $0.type == "territories" }
+            let otherResources = included.filter { $0.type != "territories" }
+
+            if !otherResources.isEmpty {
+                lines.append("")
+                lines.append("  Price Resources (\(otherResources.count)):")
+                lines.append("  " + String(repeating: "-", count: 40))
+                for resource in otherResources {
+                    let price = resource.attributes?["customerPrice"]?.value as? String
+                    let proceeds = resource.attributes?["proceeds"]?.value as? String
+                    var desc = "    [\(resource.id)] (\(resource.type))"
+                    if let price { desc += " | Price: \(price)" }
+                    if let proceeds { desc += " | Proceeds: \(proceeds)" }
+                    lines.append(desc)
+                }
+            }
+
+            if !territories.isEmpty {
+                lines.append("")
+                lines.append("  Base Territory: \(territories.map(\.id).joined(separator: ", "))")
             }
         }
 
         // Show relationships
         if let relationships = response.data.relationships {
-            if let appPrices = relationships["appPrices"] {
-                if case .many(let identifiers) = appPrices.data {
+            for (key, rel) in relationships {
+                if case .many(let identifiers) = rel.data, !identifiers.isEmpty {
                     lines.append("")
-                    lines.append("  Related App Prices: \(identifiers.count)")
-                    for identifier in identifiers {
-                        lines.append("    - \(identifier.id) (\(identifier.type))")
-                    }
+                    lines.append("  \(key): \(identifiers.count) items")
+                } else if case .single(let identifier) = rel.data {
+                    lines.append("  \(key): \(identifier.id)")
                 }
             }
         }
@@ -222,7 +233,7 @@ actor PricingManager: ToolProvider {
         let appId = try requireString(args, "app_id")
 
         var queryItems: [URLQueryItem] = [
-            URLQueryItem(name: "fields[appPricePoints]", value: "customerPrice,proceeds,priceTier"),
+            URLQueryItem(name: "fields[appPricePoints]", value: "customerPrice,proceeds"),
             URLQueryItem(name: "include", value: "territory"),
             URLQueryItem(name: "limit", value: "200"),
         ]
@@ -251,7 +262,7 @@ actor PricingManager: ToolProvider {
 
         var lines = ["Price Points for app \(appId) (\(response.data.count)):"]
         lines.append(String(repeating: "-", count: 60))
-        lines.append("  " + String(format: "%-12s %-10s %-10s %s", "Tier", "Price", "Proceeds", "Territory"))
+        lines.append("  " + "Price".padding(toLength: 10, withPad: " ", startingAt: 0) + " " + "Proceeds".padding(toLength: 10, withPad: " ", startingAt: 0) + " Territory")
         lines.append("  " + String(repeating: "-", count: 50))
 
         for point in response.data {
@@ -272,12 +283,12 @@ actor PricingManager: ToolProvider {
         let appId = try requireString(args, "app_id")
 
         let queryItems = [
-            URLQueryItem(name: "include", value: "availableTerritories"),
-            URLQueryItem(name: "limit[availableTerritories]", value: "200"),
+            URLQueryItem(name: "include", value: "territoryAvailabilities"),
+            URLQueryItem(name: "limit[territoryAvailabilities]", value: "50"),
         ]
 
         let response: ASCResponse<AppAvailability> = try await client.get(
-            path: "/v1/apps/\(appId)/appAvailability",
+            path: "/v1/apps/\(appId)/appAvailabilityV2",
             queryItems: queryItems
         )
 
@@ -292,21 +303,29 @@ actor PricingManager: ToolProvider {
             "  Available in new territories:  \(availableInNew)",
         ]
 
-        // Show available territories from included resources
+        // Show territory availabilities from included resources
         if let included = response.included {
+            let territoryAvailabilities = included.filter { $0.type == "territoryAvailabilities" }
+            if !territoryAvailabilities.isEmpty {
+                let available = territoryAvailabilities.filter {
+                    ($0.attributes?["available"]?.value as? Bool) == true
+                }
+                lines.append("")
+                lines.append("  Territory Availabilities: \(available.count) available of \(territoryAvailabilities.count) total")
+            }
+
             let territories = included.filter { $0.type == "territories" }
             if !territories.isEmpty {
                 lines.append("")
-                lines.append("  Available Territories (\(territories.count)):")
+                lines.append("  Territories (\(territories.count)):")
                 lines.append("  " + String(repeating: "-", count: 40))
 
-                // Compact multi-column display
                 let columns = 5
                 let codes = territories.map { $0.id }
 
                 var row: [String] = []
                 for (index, code) in codes.enumerated() {
-                    row.append(String(format: "%-5s", code as NSString))
+                    row.append(code.padding(toLength: 5, withPad: " ", startingAt: 0))
                     if row.count == columns || index == codes.count - 1 {
                         lines.append("    " + row.joined(separator: "  "))
                         row = []
@@ -317,10 +336,10 @@ actor PricingManager: ToolProvider {
 
         // Show territory count from relationships
         if let relationships = availability.relationships {
-            if let territories = relationships["availableTerritories"] {
-                if case .many(let identifiers) = territories.data {
+            if let territoryAvailabilities = relationships["territoryAvailabilities"] {
+                if case .many(let identifiers) = territoryAvailabilities.data {
                     lines.append("")
-                    lines.append("  Total territory count: \(identifiers.count)")
+                    lines.append("  Total territory availabilities: \(identifiers.count)")
                 }
             }
         }
@@ -332,7 +351,6 @@ actor PricingManager: ToolProvider {
 
     private func formatPricePoint(_ point: AppPricePoint, territoryMap: [String: String]) -> String {
         let attrs = point.attributes
-        let tier = attrs?.priceTier ?? "?"
         let price = attrs?.customerPrice ?? "N/A"
         let proceeds = attrs?.proceeds ?? "N/A"
 
@@ -345,6 +363,8 @@ actor PricingManager: ToolProvider {
             territory = currency.isEmpty ? identifier.id : "\(identifier.id) (\(currency))"
         }
 
-        return "  " + String(format: "%-12s %-10s %-10s %@", tier as NSString, price as NSString, proceeds as NSString, territory)
+        let paddedPrice = price.padding(toLength: 10, withPad: " ", startingAt: 0)
+        let paddedProceeds = proceeds.padding(toLength: 10, withPad: " ", startingAt: 0)
+        return "  \(paddedPrice) \(paddedProceeds) \(territory)"
     }
 }

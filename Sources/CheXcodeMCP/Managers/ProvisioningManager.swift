@@ -246,7 +246,7 @@ actor ProvisioningManager: ToolProvider {
     private func handleListCertificates(_ args: [String: Value]) async throws -> String {
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "fields[certificates]", value: "name,certificateType,displayName,platform,expirationDate,serialNumber"),
-            URLQueryItem(name: "sort", value: "-expirationDate"),
+            URLQueryItem(name: "sort", value: "displayName"),
         ]
 
         if let certType = stringValue(args, "certificate_type") {
@@ -444,7 +444,7 @@ actor ProvisioningManager: ToolProvider {
     private func handleListProfiles(_ args: [String: Value]) async throws -> String {
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "fields[profiles]", value: "name,profileType,profileState,platform,createdDate,expirationDate,uuid"),
-            URLQueryItem(name: "sort", value: "-expirationDate"),
+            URLQueryItem(name: "sort", value: "name"),
         ]
 
         if let profileType = stringValue(args, "profile_type") {
