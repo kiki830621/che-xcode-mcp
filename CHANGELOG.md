@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.3.0] - 2026-02-18
+
+### Added (13 new submission automation tools)
+
+**Build Linking**
+- `metadata_get_build_for_version` — get the build linked to an App Store version
+- `metadata_set_build_for_version` — link/unlink a build to a version (required before review submission)
+
+**Review Detail**
+- `metadata_get_review_detail` — get review contact info, demo account credentials, and notes
+- `metadata_update_review_detail` — update contact info, demo account, and reviewer notes
+
+**Localization**
+- `metadata_create_localization` — add a new language (locale) to an App Store version
+
+**Phased Release**
+- `metadata_create_phased_release` — enable 7-day phased rollout for a version
+- `metadata_update_phased_release` — pause, resume, or complete a phased release
+- `metadata_delete_phased_release` — remove phased release (release to all at once)
+
+**Release**
+- `metadata_release_version` — trigger manual release for approved versions (PENDING_DEVELOPER_RELEASE)
+
+**Screenshots**
+- `metadata_list_screenshot_sets` — list screenshot sets by device type for a localization
+- `metadata_list_screenshots` — list screenshots within a screenshot set
+
+**Age Rating**
+- `metadata_get_age_rating` — get age rating declaration (violence, gambling, etc.)
+- `metadata_update_age_rating` — update age rating content categories
+
+### Changed
+- ASCClient: added `patchNoContent` method for relationship endpoints returning 204 No Content
+- Metadata manager: 7 → 20 tools
+- Tool count: 98 → 111
+
 ## [0.2.0] - 2026-02-18
 
 ### Fixed (10 broken API tools)

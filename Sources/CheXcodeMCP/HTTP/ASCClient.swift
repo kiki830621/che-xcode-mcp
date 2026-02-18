@@ -87,6 +87,12 @@ actor ASCClient {
         return try decoder.decode(ASCResponse<T>.self, from: data)
     }
 
+    /// PATCH request with no response body expected (for relationship endpoints returning 204)
+    func patchNoContent(path: String, body: [String: Any]) async throws {
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        _ = try await request(method: "PATCH", path: path, body: bodyData)
+    }
+
     /// DELETE request (no response body expected)
     func delete(path: String) async throws {
         _ = try await request(method: "DELETE", path: path)

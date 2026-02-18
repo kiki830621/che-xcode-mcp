@@ -1,6 +1,6 @@
 # che-xcode-mcp
 
-Comprehensive App Store Connect MCP Server — 98 tools across 16 domain managers covering the full ASC API + Xcode Organizer crash logs.
+Comprehensive App Store Connect MCP Server — 111 tools across 16 domain managers covering the full ASC API + Xcode Organizer crash logs.
 
 ## Features
 
@@ -10,7 +10,7 @@ Comprehensive App Store Connect MCP Server — 98 tools across 16 domain manager
 | Apps | 5 | App listing, details, app info |
 | Reviews | 6 | Customer reviews, responses, submission |
 | Users | 7 | Team users, invitations, roles |
-| Metadata | 7 | Versions, localizations, phased release |
+| Metadata | 20 | Versions, localizations, phased release, build linking, review detail, screenshots, age rating, release |
 | Subscriptions | 12 | Groups, subscriptions, localizations, pricing |
 | Provisioning | 8 | Certificates, devices, bundle IDs, profiles |
 | Pricing | 4 | Territories, prices, price points, availability |
@@ -69,7 +69,7 @@ Add to `~/.claude/settings.json`:
 
 ## Technical Details
 
-- **Version**: 0.2.0
+- **Version**: 0.3.0
 - **Platform**: macOS 14.0+
 - **Language**: Swift 5.9
 - **MCP SDK**: [swift-sdk](https://github.com/modelcontextprotocol/swift-sdk) 0.10.x
@@ -80,6 +80,7 @@ Add to `~/.claude/settings.json`:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.3.0 | 2026-02-18 | Add 13 submission automation tools (build linking, review detail, phased release, screenshots, age rating, manual release) |
 | 0.2.0 | 2026-02-18 | Fix 10 broken API tools, add subscription/IAP localization tools, subscription pricing tools |
 | 0.1.0 | 2026-02-14 | Add Xcode Organizer crash log tools, fix diagnosticSignatures endpoint |
 | 0.0.2 | 2026-02-14 | Fix TestFlight feedback endpoint, add crash feedback tool, server instructions for AI agents |
