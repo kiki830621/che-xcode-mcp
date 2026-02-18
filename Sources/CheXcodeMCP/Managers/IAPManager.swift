@@ -16,10 +16,17 @@ struct InAppPurchaseSubmissionAttributes: Decodable {
     // Minimal — mostly relationship-based
 }
 
+struct InAppPurchaseLocalizationAttributes: Decodable {
+    let locale: String?
+    let name: String?
+    let description: String?
+}
+
 // MARK: - Type aliases
 
 private typealias InAppPurchaseV2 = ASCResource<InAppPurchaseV2Attributes>
 private typealias InAppPurchaseSubmission = ASCResource<InAppPurchaseSubmissionAttributes>
+private typealias InAppPurchaseLocalization = ASCResource<InAppPurchaseLocalizationAttributes>
 
 // MARK: - IAPManager
 
@@ -156,6 +163,44 @@ actor IAPManager: ToolProvider {
                 ]),
                 annotations: .init(destructiveHint: false)
             ),
+            Tool(
+                name: "iap_list_localizations",
+                description: "List all language versions (localizations) of an in-app purchase. Shows display name and description for each locale.",
+                inputSchema: .object([
+                    "type": "object",
+                    "properties": .object([
+                        "iap_id": .object([
+                            "type": "string",
+                            "description": "The in-app purchase ID"
+                        ])
+                    ]),
+                    "required": .array([.string("iap_id")])
+                ]),
+                annotations: .init(readOnlyHint: true)
+            ),
+            Tool(
+                name: "iap_update_localization",
+                description: "Update the display name and/or description for a specific in-app purchase localization.",
+                inputSchema: .object([
+                    "type": "object",
+                    "properties": .object([
+                        "localization_id": .object([
+                            "type": "string",
+                            "description": "The IAP localization ID (get from iap_list_localizations)"
+                        ]),
+                        "name": .object([
+                            "type": "string",
+                            "description": "Updated display name shown to users"
+                        ]),
+                        "description": .object([
+                            "type": "string",
+                            "description": "Updated description shown to users"
+                        ])
+                    ]),
+                    "required": .array([.string("localization_id")])
+                ]),
+                annotations: .init(destructiveHint: false)
+            ),
         ]
     }
 
@@ -173,6 +218,10 @@ actor IAPManager: ToolProvider {
             return try await handleDeleteIAP(arguments)
         case "iap_submit_iap":
             return try await handleSubmitIAP(arguments)
+        case "iap_list_localizations":
+            return try await handleListLocalizations(arguments)
+        case "iap_update_localization":
+            return try await handleUpdateLocalization(arguments)
         default:
             throw ASCClientError.invalidResponse("Unknown IAP tool: \(name)")
         }
@@ -342,7 +391,79 @@ actor IAPManager: ToolProvider {
         return "In-app purchase \(iapId) submitted for review.\nSubmission ID: \(response.data.id)"
     }
 
+    // MARK: - Handler: List Localizations
+
+    private func handleListLocalizations(_ args: [String: Value]) async throws -> String {
+        let iapId = try requireString(args, "iap_id")
+
+        let queryItems = [
+            URLQueryItem(name: "fields[inAppPurchaseLocalizations]", value: "locale,name,description"),
+            URLQueryItem(name: "limit", value: "200"),
+        ]
+
+        let response: ASCListResponse<InAppPurchaseLocalization> = try await client.getList(
+            path: "/v1/inAppPurchasesV2/\(iapId)/inAppPurchaseLocalizations",
+            queryItems: queryItems
+        )
+
+        if response.data.isEmpty {
+            return "No localizations found for in-app purchase \(iapId)."
+        }
+
+        var lines = ["IAP Localizations (\(response.data.count)):"]
+        lines.append(String(repeating: "-", count: 60))
+        for localization in response.data {
+            lines.append(formatLocalization(localization))
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    // MARK: - Handler: Update Localization
+
+    private func handleUpdateLocalization(_ args: [String: Value]) async throws -> String {
+        let localizationId = try requireString(args, "localization_id")
+
+        var attributes: [String: Any] = [:]
+        if let name = stringValue(args, "name") {
+            attributes["name"] = name
+        }
+        if let description = stringValue(args, "description") {
+            attributes["description"] = description
+        }
+
+        if attributes.isEmpty {
+            return "No updatable attributes provided. Updatable fields: name, description."
+        }
+
+        let body: [String: Any] = [
+            "data": [
+                "type": "inAppPurchaseLocalizations",
+                "id": localizationId,
+                "attributes": attributes
+            ]
+        ]
+
+        let response: ASCResponse<InAppPurchaseLocalization> = try await client.patch(
+            path: "/v1/inAppPurchaseLocalizations/\(localizationId)",
+            body: body
+        )
+
+        let loc = response.data
+        let locale = loc.attributes?.locale ?? "?"
+        let name = loc.attributes?.name ?? "N/A"
+        return "Successfully updated IAP localization \(localizationId) [\(locale)].\nName: \(name)"
+    }
+
     // MARK: - Formatters
+
+    private func formatLocalization(_ loc: InAppPurchaseLocalization) -> String {
+        let attrs = loc.attributes
+        let locale = attrs?.locale ?? "?"
+        let name = attrs?.name ?? "N/A"
+        let description = attrs?.description ?? "N/A"
+        let truncatedDesc = description.count > 80 ? String(description.prefix(77)) + "..." : description
+        return "  [\(loc.id)] \(locale) — \(name)\n    Description: \(truncatedDesc)"
+    }
 
     private func formatIAPType(_ type: String?) -> String {
         switch type {

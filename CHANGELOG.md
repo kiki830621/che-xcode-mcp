@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.2.0] - 2026-02-18
+
+### Fixed (10 broken API tools)
+- `metadata_list_versions` — removed unsupported `sort=-createdDate` parameter
+- `iap_list_iaps` / `iap_get_iap` — fixed field type name from `fields[inAppPurchasesV2]` to `fields[inAppPurchases]`
+- `users_list_users` / `users_get_user` — removed invalid `email` from `fields[users]` (email comes from response attributes, not a requestable field)
+- `users_list_invitations` — changed invalid `sort=-expirationDate` to `sort=email`
+- `provisioning_list_profiles` — changed invalid `sort=-expirationDate` to `sort=name`
+- `provisioning_list_certificates` — changed invalid `sort=-expirationDate` to `sort=displayName`
+- `pricing_get_app_prices` — changed invalid `include=appPrices` to `include=manualPrices,automaticPrices,baseTerritory`; updated path to use appPriceSchedule v3
+- `pricing_get_availability` — changed removed `appAvailability` path to `appAvailabilityV2`; updated include to `territoryAvailabilities`
+- `pricing_list_territories` — fixed crash from `NSString` + `%s` format specifier; replaced with Swift `.padding()`
+- `pricing_list_price_points` — removed invalid `priceTier` field; fixed same `NSString`/`%s` crash
+
+### Added
+- `subscription_list_localizations` — list all language versions of a subscription (name, description)
+- `subscription_update_localization` — update subscription display name/description for a specific locale
+- `subscription_create_localization` — add a new language version for a subscription
+- `iap_list_localizations` — list all language versions of an in-app purchase
+- `iap_update_localization` — update IAP display name/description for a specific locale
+- `subscription_list_prices` — list subscription prices across territories
+- `subscription_list_price_points` — list available subscription price points for a territory
+
+### Changed
+- JWTManager: replaced `try!` with proper `do-catch` error handling
+- Wrapper script now unconditionally overrides env vars from `~/.appstoreconnect/config` (fixes 401 auth caching issue)
+- Tool count: 91 → 98
+
 ## [0.1.0] - 2026-02-14
 
 ### Added

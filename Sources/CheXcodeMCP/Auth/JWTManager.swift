@@ -63,8 +63,8 @@ actor JWTManager {
     // MARK: - Token Generation
 
     private func generateToken() throws -> String {
-        let header = Self.buildHeader(keyID: keyID)
-        let payload = Self.buildPayload(issuerID: issuerID, expirationInterval: tokenLifetime)
+        let header = try Self.buildHeader(keyID: keyID)
+        let payload = try Self.buildPayload(issuerID: issuerID, expirationInterval: tokenLifetime)
         let signingInput = "\(header).\(payload)"
 
         let privateKey = try loadPrivateKey()
@@ -92,13 +92,13 @@ actor JWTManager {
 
     // MARK: - Static Helpers (testable)
 
-    static func buildHeader(keyID: String) -> String {
+    static func buildHeader(keyID: String) throws -> String {
         let header: [String: String] = ["alg": "ES256", "kid": keyID, "typ": "JWT"]
-        let data = try! JSONSerialization.data(withJSONObject: header, options: .sortedKeys)
+        let data = try JSONSerialization.data(withJSONObject: header, options: .sortedKeys)
         return data.base64URLEncoded()
     }
 
-    static func buildPayload(issuerID: String, expirationInterval: TimeInterval) -> String {
+    static func buildPayload(issuerID: String, expirationInterval: TimeInterval) throws -> String {
         let now = Date()
         let payload: [String: Any] = [
             "iss": issuerID,
@@ -106,7 +106,7 @@ actor JWTManager {
             "exp": Int(now.addingTimeInterval(expirationInterval).timeIntervalSince1970),
             "aud": "appstoreconnect-v1"
         ]
-        let data = try! JSONSerialization.data(withJSONObject: payload, options: .sortedKeys)
+        let data = try JSONSerialization.data(withJSONObject: payload, options: .sortedKeys)
         return data.base64URLEncoded()
     }
 }

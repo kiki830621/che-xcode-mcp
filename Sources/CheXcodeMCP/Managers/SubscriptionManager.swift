@@ -17,10 +17,29 @@ struct SubscriptionAttributes: Decodable {
     let groupLevel: Int?
 }
 
+struct SubscriptionLocalizationAttributes: Decodable {
+    let locale: String?
+    let name: String?
+    let description: String?
+}
+
+struct SubscriptionPriceAttributes: Decodable {
+    let startDate: String?
+    let preserved: Bool?
+}
+
+struct SubscriptionPricePointAttributes: Decodable {
+    let customerPrice: String?
+    let proceeds: String?
+}
+
 // MARK: - Type aliases
 
 private typealias SubscriptionGroup = ASCResource<SubscriptionGroupAttributes>
 private typealias Subscription = ASCResource<SubscriptionAttributes>
+private typealias SubscriptionLocalization = ASCResource<SubscriptionLocalizationAttributes>
+private typealias SubscriptionPrice = ASCResource<SubscriptionPriceAttributes>
+private typealias SubscriptionPricePoint = ASCResource<SubscriptionPricePointAttributes>
 
 // MARK: - SubscriptionManager
 
@@ -172,6 +191,113 @@ actor SubscriptionManager: ToolProvider {
                 ]),
                 annotations: .init(destructiveHint: false)
             ),
+            Tool(
+                name: "subscription_list_localizations",
+                description: "List all language versions (localizations) of a subscription. Shows display name and description for each locale.",
+                inputSchema: .object([
+                    "type": "object",
+                    "properties": .object([
+                        "subscription_id": .object([
+                            "type": "string",
+                            "description": "The subscription ID"
+                        ])
+                    ]),
+                    "required": .array([.string("subscription_id")])
+                ]),
+                annotations: .init(readOnlyHint: true)
+            ),
+            Tool(
+                name: "subscription_update_localization",
+                description: "Update the display name and/or description for a specific subscription localization.",
+                inputSchema: .object([
+                    "type": "object",
+                    "properties": .object([
+                        "localization_id": .object([
+                            "type": "string",
+                            "description": "The subscription localization ID (get from subscription_list_localizations)"
+                        ]),
+                        "name": .object([
+                            "type": "string",
+                            "description": "Updated display name shown to users"
+                        ]),
+                        "description": .object([
+                            "type": "string",
+                            "description": "Updated description shown to users"
+                        ])
+                    ]),
+                    "required": .array([.string("localization_id")])
+                ]),
+                annotations: .init(destructiveHint: false)
+            ),
+            Tool(
+                name: "subscription_create_localization",
+                description: "Add a new language version for a subscription.",
+                inputSchema: .object([
+                    "type": "object",
+                    "properties": .object([
+                        "subscription_id": .object([
+                            "type": "string",
+                            "description": "The subscription ID to add a localization to"
+                        ]),
+                        "locale": .object([
+                            "type": "string",
+                            "description": "Locale code (e.g. \"en-US\", \"zh-Hant\", \"ja\")"
+                        ]),
+                        "name": .object([
+                            "type": "string",
+                            "description": "Display name for this locale"
+                        ]),
+                        "description": .object([
+                            "type": "string",
+                            "description": "Description for this locale"
+                        ])
+                    ]),
+                    "required": .array([.string("subscription_id"), .string("locale"), .string("name")])
+                ]),
+                annotations: .init(destructiveHint: false)
+            ),
+            Tool(
+                name: "subscription_list_prices",
+                description: "List subscription prices across territories. Shows price, territory, and start date.",
+                inputSchema: .object([
+                    "type": "object",
+                    "properties": .object([
+                        "subscription_id": .object([
+                            "type": "string",
+                            "description": "The subscription ID"
+                        ]),
+                        "limit": .object([
+                            "type": "integer",
+                            "description": "Maximum number of prices to return (default 200, max 200)"
+                        ])
+                    ]),
+                    "required": .array([.string("subscription_id")])
+                ]),
+                annotations: .init(readOnlyHint: true)
+            ),
+            Tool(
+                name: "subscription_list_price_points",
+                description: "List available price points for a subscription. Optionally filter by territory.",
+                inputSchema: .object([
+                    "type": "object",
+                    "properties": .object([
+                        "subscription_id": .object([
+                            "type": "string",
+                            "description": "The subscription ID"
+                        ]),
+                        "territory": .object([
+                            "type": "string",
+                            "description": "Filter by territory ID (e.g. \"USA\", \"TWN\")"
+                        ]),
+                        "limit": .object([
+                            "type": "integer",
+                            "description": "Maximum number of price points to return (default 200, max 200)"
+                        ])
+                    ]),
+                    "required": .array([.string("subscription_id")])
+                ]),
+                annotations: .init(readOnlyHint: true)
+            ),
         ]
     }
 
@@ -191,6 +317,16 @@ actor SubscriptionManager: ToolProvider {
             return try await handleCreateSubscription(arguments)
         case "subscription_update_subscription":
             return try await handleUpdateSubscription(arguments)
+        case "subscription_list_localizations":
+            return try await handleListLocalizations(arguments)
+        case "subscription_update_localization":
+            return try await handleUpdateLocalization(arguments)
+        case "subscription_create_localization":
+            return try await handleCreateLocalization(arguments)
+        case "subscription_list_prices":
+            return try await handleListPrices(arguments)
+        case "subscription_list_price_points":
+            return try await handleListPricePoints(arguments)
         default:
             throw ASCClientError.invalidResponse("Unknown Subscription tool: \(name)")
         }
@@ -398,7 +534,259 @@ actor SubscriptionManager: ToolProvider {
         return lines.joined(separator: "\n")
     }
 
+    // MARK: - Handler: List Localizations
+
+    private func handleListLocalizations(_ args: [String: Value]) async throws -> String {
+        let subscriptionId = try requireString(args, "subscription_id")
+
+        let queryItems = [
+            URLQueryItem(name: "fields[subscriptionLocalizations]", value: "locale,name,description"),
+            URLQueryItem(name: "limit", value: "200"),
+        ]
+
+        let response: ASCListResponse<SubscriptionLocalization> = try await client.getList(
+            path: "/v1/subscriptions/\(subscriptionId)/subscriptionLocalizations",
+            queryItems: queryItems
+        )
+
+        if response.data.isEmpty {
+            return "No localizations found for subscription \(subscriptionId)."
+        }
+
+        var lines = ["Subscription Localizations (\(response.data.count)):"]
+        lines.append(String(repeating: "-", count: 60))
+        for localization in response.data {
+            lines.append(formatLocalization(localization))
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    // MARK: - Handler: Update Localization
+
+    private func handleUpdateLocalization(_ args: [String: Value]) async throws -> String {
+        let localizationId = try requireString(args, "localization_id")
+
+        var attributes: [String: Any] = [:]
+        if let name = stringValue(args, "name") {
+            attributes["name"] = name
+        }
+        if let description = stringValue(args, "description") {
+            attributes["description"] = description
+        }
+
+        if attributes.isEmpty {
+            return "No updatable attributes provided. Updatable fields: name, description."
+        }
+
+        let body: [String: Any] = [
+            "data": [
+                "type": "subscriptionLocalizations",
+                "id": localizationId,
+                "attributes": attributes
+            ]
+        ]
+
+        let response: ASCResponse<SubscriptionLocalization> = try await client.patch(
+            path: "/v1/subscriptionLocalizations/\(localizationId)",
+            body: body
+        )
+
+        let loc = response.data
+        let locale = loc.attributes?.locale ?? "?"
+        let name = loc.attributes?.name ?? "N/A"
+        return "Successfully updated localization \(localizationId) [\(locale)].\nName: \(name)"
+    }
+
+    // MARK: - Handler: Create Localization
+
+    private func handleCreateLocalization(_ args: [String: Value]) async throws -> String {
+        let subscriptionId = try requireString(args, "subscription_id")
+        let locale = try requireString(args, "locale")
+        let name = try requireString(args, "name")
+
+        var attributes: [String: Any] = [
+            "locale": locale,
+            "name": name,
+        ]
+        if let description = stringValue(args, "description") {
+            attributes["description"] = description
+        }
+
+        let body: [String: Any] = [
+            "data": [
+                "type": "subscriptionLocalizations",
+                "attributes": attributes,
+                "relationships": [
+                    "subscription": [
+                        "data": [
+                            "type": "subscriptions",
+                            "id": subscriptionId
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+        let response: ASCResponse<SubscriptionLocalization> = try await client.post(
+            path: "/v1/subscriptionLocalizations",
+            body: body
+        )
+
+        let loc = response.data
+        return "Successfully created localization for subscription \(subscriptionId).\nLocalization ID: \(loc.id)\nLocale: \(locale)\nName: \(name)"
+    }
+
+    // MARK: - Handler: List Prices
+
+    private func handleListPrices(_ args: [String: Value]) async throws -> String {
+        let subscriptionId = try requireString(args, "subscription_id")
+        let limit = intValue(args, "limit") ?? 200
+
+        let queryItems = [
+            URLQueryItem(name: "include", value: "subscriptionPricePoint,territory"),
+            URLQueryItem(name: "limit", value: String(min(limit, 200))),
+        ]
+
+        let response: ASCListResponse<SubscriptionPrice> = try await client.getList(
+            path: "/v1/subscriptions/\(subscriptionId)/prices",
+            queryItems: queryItems
+        )
+
+        if response.data.isEmpty {
+            return "No prices found for subscription \(subscriptionId)."
+        }
+
+        // Build lookup maps from included resources
+        var pricePointMap: [String: (price: String, proceeds: String)] = [:]
+        var territoryMap: [String: String] = [:]
+
+        if let included = response.included {
+            for resource in included {
+                if resource.type == "subscriptionPricePoints" {
+                    let price = resource.attributes?["customerPrice"]?.value as? String ?? "?"
+                    let proceeds = resource.attributes?["proceeds"]?.value as? String ?? "?"
+                    pricePointMap[resource.id] = (price: price, proceeds: proceeds)
+                } else if resource.type == "territories" {
+                    let currency = resource.attributes?["currency"]?.value as? String ?? "?"
+                    territoryMap[resource.id] = currency
+                }
+            }
+        }
+
+        var lines = ["Subscription Prices (\(response.data.count)):"]
+        lines.append(String(repeating: "-", count: 60))
+        lines.append("  " + "Price".padding(toLength: 10, withPad: " ", startingAt: 0) + " " + "Proceeds".padding(toLength: 10, withPad: " ", startingAt: 0) + " Territory   Start Date")
+        lines.append("  " + String(repeating: "-", count: 55))
+
+        for price in response.data {
+            lines.append(formatPrice(price, pricePointMap: pricePointMap, territoryMap: territoryMap))
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    // MARK: - Handler: List Price Points
+
+    private func handleListPricePoints(_ args: [String: Value]) async throws -> String {
+        let subscriptionId = try requireString(args, "subscription_id")
+        let limit = intValue(args, "limit") ?? 200
+
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "fields[subscriptionPricePoints]", value: "customerPrice,proceeds"),
+            URLQueryItem(name: "include", value: "territory"),
+            URLQueryItem(name: "limit", value: String(min(limit, 200))),
+        ]
+
+        if let territory = stringValue(args, "territory") {
+            queryItems.append(URLQueryItem(name: "filter[territory]", value: territory))
+        }
+
+        let response: ASCListResponse<SubscriptionPricePoint> = try await client.getList(
+            path: "/v1/subscriptions/\(subscriptionId)/pricePoints",
+            queryItems: queryItems
+        )
+
+        if response.data.isEmpty {
+            return "No price points found for subscription \(subscriptionId)."
+        }
+
+        // Build territory lookup from included resources
+        var territoryMap: [String: String] = [:]
+        if let included = response.included {
+            for resource in included where resource.type == "territories" {
+                let currency = resource.attributes?["currency"]?.value as? String ?? "?"
+                territoryMap[resource.id] = currency
+            }
+        }
+
+        var lines = ["Subscription Price Points (\(response.data.count)):"]
+        lines.append(String(repeating: "-", count: 60))
+        lines.append("  " + "Price".padding(toLength: 10, withPad: " ", startingAt: 0) + " " + "Proceeds".padding(toLength: 10, withPad: " ", startingAt: 0) + " Territory")
+        lines.append("  " + String(repeating: "-", count: 50))
+
+        for point in response.data {
+            let price = point.attributes?.customerPrice ?? "N/A"
+            let proceeds = point.attributes?.proceeds ?? "N/A"
+
+            var territory = "?"
+            if let relationships = point.relationships,
+               let territoryRel = relationships["territory"],
+               case .single(let identifier) = territoryRel.data {
+                let currency = territoryMap[identifier.id] ?? ""
+                territory = currency.isEmpty ? identifier.id : "\(identifier.id) (\(currency))"
+            }
+
+            let paddedPrice = price.padding(toLength: 10, withPad: " ", startingAt: 0)
+            let paddedProceeds = proceeds.padding(toLength: 10, withPad: " ", startingAt: 0)
+            lines.append("  \(paddedPrice) \(paddedProceeds) \(territory)")
+        }
+
+        if let paging = response.meta?.paging, let total = paging.total {
+            lines.append(String(repeating: "-", count: 60))
+            lines.append("Showing \(response.data.count) of \(total) total price points.")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
     // MARK: - Formatters
+
+    private func formatLocalization(_ loc: SubscriptionLocalization) -> String {
+        let attrs = loc.attributes
+        let locale = attrs?.locale ?? "?"
+        let name = attrs?.name ?? "N/A"
+        let description = attrs?.description ?? "N/A"
+        let truncatedDesc = description.count > 80 ? String(description.prefix(77)) + "..." : description
+        return "  [\(loc.id)] \(locale) — \(name)\n    Description: \(truncatedDesc)"
+    }
+
+    private func formatPrice(_ price: SubscriptionPrice, pricePointMap: [String: (price: String, proceeds: String)], territoryMap: [String: String]) -> String {
+        let startDate = price.attributes?.startDate ?? "N/A"
+
+        // Resolve price point and territory from relationships
+        var customerPrice = "?"
+        var proceeds = "?"
+        var territory = "?"
+
+        if let relationships = price.relationships {
+            if let ppRel = relationships["subscriptionPricePoint"],
+               case .single(let ppId) = ppRel.data,
+               let pp = pricePointMap[ppId.id] {
+                customerPrice = pp.price
+                proceeds = pp.proceeds
+            }
+            if let tRel = relationships["territory"],
+               case .single(let tId) = tRel.data {
+                let currency = territoryMap[tId.id] ?? ""
+                territory = currency.isEmpty ? tId.id : "\(tId.id) (\(currency))"
+            }
+        }
+
+        let paddedPrice = customerPrice.padding(toLength: 10, withPad: " ", startingAt: 0)
+        let paddedProceeds = proceeds.padding(toLength: 10, withPad: " ", startingAt: 0)
+        let paddedTerritory = territory.padding(toLength: 12, withPad: " ", startingAt: 0)
+        return "  \(paddedPrice) \(paddedProceeds) \(paddedTerritory) \(startDate)"
+    }
 
     private func formatPeriod(_ period: String?) -> String {
         guard let period else { return "N/A" }
