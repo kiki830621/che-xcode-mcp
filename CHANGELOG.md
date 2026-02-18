@@ -31,10 +31,19 @@
 - `metadata_get_age_rating` — get age rating declaration (violence, gambling, etc.)
 - `metadata_update_age_rating` — update age rating content categories
 
+**Screenshot Upload**
+- `metadata_create_screenshot_set` — create a screenshot set for a device type
+- `metadata_upload_screenshot` — upload screenshot from local file (3-step: reserve → upload → commit with MD5)
+- `metadata_delete_screenshot` — delete a screenshot
+- `metadata_delete_screenshot_set` — delete an entire screenshot set
+
 ### Changed
-- ASCClient: added `patchNoContent` method for relationship endpoints returning 204 No Content
-- Metadata manager: 7 → 20 tools
-- Tool count: 98 → 111
+- ASCClient: added `patchNoContent` for 204 No Content, `getOptional` for nullable responses
+- Metadata manager: 7 → 24 tools
+- Tool count: 98 → 115
+
+### Fixed
+- Gracefully handle null data from ASC API (unlinked build, missing review detail, no phased release)
 
 ## [0.2.0] - 2026-02-18
 
