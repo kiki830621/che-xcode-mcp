@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import MCP
 
@@ -71,6 +72,38 @@ struct AppScreenshotAttributes: Decodable {
     let sourceFileChecksum: String?
 }
 
+/// Extended screenshot attributes including upload operations (returned by POST /v1/appScreenshots)
+struct AppScreenshotUploadAttributes: Decodable {
+    let fileSize: Int?
+    let fileName: String?
+    let sourceFileChecksum: String?
+    let uploadOperations: [ASCUploadOperation]?
+    let assetDeliveryState: ASCAssetDeliveryState?
+}
+
+struct ASCUploadOperation: Decodable {
+    let method: String?
+    let url: String?
+    let length: Int?
+    let offset: Int?
+    let requestHeaders: [ASCUploadHeader]?
+}
+
+struct ASCUploadHeader: Decodable {
+    let name: String?
+    let value: String?
+}
+
+struct ASCAssetDeliveryState: Decodable {
+    let state: String?
+    let errors: [ASCAssetError]?
+}
+
+struct ASCAssetError: Decodable {
+    let code: String?
+    let description: String?
+}
+
 struct AppStoreVersionReleaseRequestAttributes: Decodable {
     // This resource has no significant attributes
 }
@@ -84,6 +117,7 @@ private typealias AppStoreReviewDetail = ASCResource<AppStoreReviewDetailAttribu
 private typealias AgeRatingDeclaration = ASCResource<AgeRatingDeclarationAttributes>
 private typealias AppScreenshotSet = ASCResource<AppScreenshotSetAttributes>
 private typealias AppScreenshot = ASCResource<AppScreenshotAttributes>
+private typealias AppScreenshotUpload = ASCResource<AppScreenshotUploadAttributes>
 private typealias AppStoreVersionReleaseRequest = ASCResource<AppStoreVersionReleaseRequestAttributes>
 // Build type is defined in TestFlightManager.swift — reusable here
 private typealias Build = ASCResource<BuildAttributes>
@@ -509,6 +543,79 @@ actor MetadataManager: ToolProvider {
                 annotations: .init(readOnlyHint: true)
             ),
 
+            Tool(
+                name: "metadata_create_screenshot_set",
+                description: """
+                    Create a screenshot set for a specific device type within a localization. \
+                    Common display types: APP_IPHONE_67 (6.7" iPhone 16 Pro Max), APP_IPHONE_65 (6.5" iPhone 11 Pro Max), \
+                    APP_IPHONE_61 (6.1"), APP_IPAD_PRO_3GEN_129 (iPad Pro 12.9"), APP_IPAD_PRO_3GEN_11 (iPad Pro 11").
+                    """,
+                inputSchema: .object([
+                    "type": "object",
+                    "properties": .object([
+                        "localization_id": .object([
+                            "type": "string",
+                            "description": "The App Store version localization ID"
+                        ]),
+                        "display_type": .object([
+                            "type": "string",
+                            "description": "Screenshot display type (e.g. APP_IPHONE_67, APP_IPHONE_65, APP_IPAD_PRO_3GEN_129)"
+                        ])
+                    ]),
+                    "required": .array([.string("localization_id"), .string("display_type")])
+                ]),
+                annotations: .init(destructiveHint: false)
+            ),
+            Tool(
+                name: "metadata_upload_screenshot",
+                description: "Upload a screenshot from a local file to a screenshot set. Handles the full 3-step upload: reserve → upload chunks → commit. Supports PNG and JPEG. Get screenshot_set_id from metadata_list_screenshot_sets or metadata_create_screenshot_set.",
+                inputSchema: .object([
+                    "type": "object",
+                    "properties": .object([
+                        "screenshot_set_id": .object([
+                            "type": "string",
+                            "description": "The screenshot set ID"
+                        ]),
+                        "file_path": .object([
+                            "type": "string",
+                            "description": "Local file path to the screenshot (PNG or JPEG). Supports ~ for home directory."
+                        ])
+                    ]),
+                    "required": .array([.string("screenshot_set_id"), .string("file_path")])
+                ]),
+                annotations: .init(destructiveHint: false)
+            ),
+            Tool(
+                name: "metadata_delete_screenshot",
+                description: "Delete a screenshot from a screenshot set. Get screenshot_id from metadata_list_screenshots.",
+                inputSchema: .object([
+                    "type": "object",
+                    "properties": .object([
+                        "screenshot_id": .object([
+                            "type": "string",
+                            "description": "The screenshot ID to delete"
+                        ])
+                    ]),
+                    "required": .array([.string("screenshot_id")])
+                ]),
+                annotations: .init(destructiveHint: true)
+            ),
+            Tool(
+                name: "metadata_delete_screenshot_set",
+                description: "Delete an entire screenshot set and all screenshots within it. Get screenshot_set_id from metadata_list_screenshot_sets.",
+                inputSchema: .object([
+                    "type": "object",
+                    "properties": .object([
+                        "screenshot_set_id": .object([
+                            "type": "string",
+                            "description": "The screenshot set ID to delete"
+                        ])
+                    ]),
+                    "required": .array([.string("screenshot_set_id")])
+                ]),
+                annotations: .init(destructiveHint: true)
+            ),
+
             // --- Age Rating ---
             Tool(
                 name: "metadata_get_age_rating",
@@ -644,6 +751,14 @@ actor MetadataManager: ToolProvider {
             return try await handleListScreenshotSets(arguments)
         case "metadata_list_screenshots":
             return try await handleListScreenshots(arguments)
+        case "metadata_create_screenshot_set":
+            return try await handleCreateScreenshotSet(arguments)
+        case "metadata_upload_screenshot":
+            return try await handleUploadScreenshot(arguments)
+        case "metadata_delete_screenshot":
+            return try await handleDeleteScreenshot(arguments)
+        case "metadata_delete_screenshot_set":
+            return try await handleDeleteScreenshotSet(arguments)
         case "metadata_get_age_rating":
             return try await handleGetAgeRating(arguments)
         case "metadata_update_age_rating":
@@ -1212,6 +1327,169 @@ actor MetadataManager: ToolProvider {
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    // MARK: - Handler: Create Screenshot Set
+
+    private func handleCreateScreenshotSet(_ args: [String: Value]) async throws -> String {
+        let localizationId = try requireString(args, "localization_id")
+        let displayType = try requireString(args, "display_type")
+
+        let body: [String: Any] = [
+            "data": [
+                "type": "appScreenshotSets",
+                "attributes": [
+                    "screenshotDisplayType": displayType
+                ],
+                "relationships": [
+                    "appStoreVersionLocalization": [
+                        "data": [
+                            "type": "appStoreVersionLocalizations",
+                            "id": localizationId
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+        let response: ASCResponse<AppScreenshotSet> = try await client.post(
+            path: "/v1/appScreenshotSets",
+            body: body
+        )
+
+        let set = response.data
+        return "Created screenshot set for \(formatDisplayType(displayType)).\nScreenshot Set ID: \(set.id)"
+    }
+
+    // MARK: - Handler: Upload Screenshot
+
+    private func handleUploadScreenshot(_ args: [String: Value]) async throws -> String {
+        let screenshotSetId = try requireString(args, "screenshot_set_id")
+        let filePath = try requireString(args, "file_path")
+
+        // 1. Read local file
+        let expandedPath = NSString(string: filePath).expandingTildeInPath
+        guard FileManager.default.fileExists(atPath: expandedPath) else {
+            return "File not found: \(filePath)"
+        }
+        guard let fileData = FileManager.default.contents(atPath: expandedPath) else {
+            return "Could not read file: \(filePath)"
+        }
+
+        let fileName = URL(fileURLWithPath: expandedPath).lastPathComponent
+        let fileSize = fileData.count
+
+        // 2. Compute MD5 checksum
+        let md5 = Insecure.MD5.hash(data: fileData)
+        let checksum = md5.map { String(format: "%02hhx", $0) }.joined()
+
+        // 3. Reserve screenshot (POST /v1/appScreenshots)
+        let reserveBody: [String: Any] = [
+            "data": [
+                "type": "appScreenshots",
+                "attributes": [
+                    "fileName": fileName,
+                    "fileSize": fileSize
+                ],
+                "relationships": [
+                    "appScreenshotSet": [
+                        "data": [
+                            "type": "appScreenshotSets",
+                            "id": screenshotSetId
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+        let reserveResponse: ASCResponse<AppScreenshotUpload> = try await client.post(
+            path: "/v1/appScreenshots",
+            body: reserveBody
+        )
+
+        let screenshot = reserveResponse.data
+        let screenshotId = screenshot.id
+
+        guard let operations = screenshot.attributes?.uploadOperations, !operations.isEmpty else {
+            return "Error: No upload operations returned for screenshot \(screenshotId). File may be invalid or duplicate."
+        }
+
+        // 4. Upload chunks to Apple's CDN
+        let session = URLSession.shared
+        for (index, operation) in operations.enumerated() {
+            guard let method = operation.method,
+                  let urlString = operation.url,
+                  let url = URL(string: urlString),
+                  let offset = operation.offset,
+                  let length = operation.length else {
+                return "Error: Invalid upload operation at index \(index)."
+            }
+
+            let endIndex = min(offset + length, fileData.count)
+            let chunk = fileData[offset..<endIndex]
+
+            var request = URLRequest(url: url)
+            request.httpMethod = method
+            request.httpBody = Data(chunk)
+
+            if let headers = operation.requestHeaders {
+                for header in headers {
+                    if let name = header.name, let value = header.value {
+                        request.setValue(value, forHTTPHeaderField: name)
+                    }
+                }
+            }
+
+            let (_, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+                return "Upload failed at chunk \(index + 1)/\(operations.count) (offset \(offset), \(length) bytes). HTTP \(statusCode)."
+            }
+        }
+
+        // 5. Commit upload (PATCH /v1/appScreenshots/{id})
+        let commitBody: [String: Any] = [
+            "data": [
+                "type": "appScreenshots",
+                "id": screenshotId,
+                "attributes": [
+                    "uploaded": true,
+                    "sourceFileChecksum": checksum
+                ]
+            ]
+        ]
+
+        let commitResponse: ASCResponse<AppScreenshotUpload> = try await client.patch(
+            path: "/v1/appScreenshots/\(screenshotId)",
+            body: commitBody
+        )
+
+        let state = commitResponse.data.attributes?.assetDeliveryState?.state ?? "UPLOADED"
+        return """
+            Screenshot uploaded successfully!
+              Screenshot ID: \(screenshotId)
+              File: \(fileName) (\(formatFileSize(fileSize)))
+              Checksum: \(checksum)
+              State: \(state)
+              Chunks: \(operations.count)
+            """
+    }
+
+    // MARK: - Handler: Delete Screenshot
+
+    private func handleDeleteScreenshot(_ args: [String: Value]) async throws -> String {
+        let screenshotId = try requireString(args, "screenshot_id")
+        try await client.delete(path: "/v1/appScreenshots/\(screenshotId)")
+        return "Deleted screenshot \(screenshotId)."
+    }
+
+    // MARK: - Handler: Delete Screenshot Set
+
+    private func handleDeleteScreenshotSet(_ args: [String: Value]) async throws -> String {
+        let screenshotSetId = try requireString(args, "screenshot_set_id")
+        try await client.delete(path: "/v1/appScreenshotSets/\(screenshotSetId)")
+        return "Deleted screenshot set \(screenshotSetId) and all screenshots within it."
     }
 
     // MARK: - Handler: Get Age Rating
