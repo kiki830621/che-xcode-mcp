@@ -921,12 +921,15 @@ actor MetadataManager: ToolProvider {
             URLQueryItem(name: "fields[builds]", value: "version,uploadedDate,processingState,minOsVersion,expirationDate")
         ]
 
-        let response: ASCResponse<Build> = try await client.get(
+        let build: Build? = try await client.getOptional(
             path: "/v1/appStoreVersions/\(versionId)/build",
             queryItems: queryItems
         )
 
-        let build = response.data
+        guard let build else {
+            return "No build linked to App Store version \(versionId).\nUse metadata_set_build_for_version to link a build (get build_id from testflight_list_builds)."
+        }
+
         let attrs = build.attributes
         var lines = [
             "Build Linked to Version \(versionId)",
@@ -983,12 +986,24 @@ actor MetadataManager: ToolProvider {
             URLQueryItem(name: "fields[appStoreReviewDetails]", value: "contactFirstName,contactLastName,contactPhone,contactEmail,demoAccountName,demoAccountPassword,demoAccountRequired,notes")
         ]
 
-        let response: ASCResponse<AppStoreReviewDetail> = try await client.get(
-            path: "/v1/appStoreVersions/\(versionId)/appStoreReviewDetail",
-            queryItems: queryItems
-        )
+        do {
+            let detail: AppStoreReviewDetail? = try await client.getOptional(
+                path: "/v1/appStoreVersions/\(versionId)/appStoreReviewDetail",
+                queryItems: queryItems
+            )
 
-        return formatReviewDetail(response.data)
+            guard let detail else {
+                return "No review detail found for version \(versionId).\nReview detail is auto-created when you first update it via metadata_update_review_detail."
+            }
+
+            return formatReviewDetail(detail)
+        } catch {
+            // 404 means no review detail exists yet
+            if "\(error)".contains("404") {
+                return "No review detail found for version \(versionId).\nReview detail is auto-created when you first update it via metadata_update_review_detail."
+            }
+            throw error
+        }
     }
 
     // MARK: - Handler: Update Review Detail
@@ -1032,11 +1047,22 @@ actor MetadataManager: ToolProvider {
     private func handleGetPhasedRelease(_ args: [String: Value]) async throws -> String {
         let versionId = try requireString(args, "version_id")
 
-        let response: ASCResponse<AppStoreVersionPhasedRelease> = try await client.get(
-            path: "/v1/appStoreVersions/\(versionId)/appStoreVersionPhasedRelease"
-        )
+        do {
+            let release: AppStoreVersionPhasedRelease? = try await client.getOptional(
+                path: "/v1/appStoreVersions/\(versionId)/appStoreVersionPhasedRelease"
+            )
 
-        return formatPhasedReleaseDetailed(response.data)
+            guard let release else {
+                return "No phased release configured for version \(versionId).\nUse metadata_create_phased_release to enable 7-day phased rollout."
+            }
+
+            return formatPhasedReleaseDetailed(release)
+        } catch {
+            if "\(error)".contains("404") {
+                return "No phased release configured for version \(versionId).\nUse metadata_create_phased_release to enable 7-day phased rollout."
+            }
+            throw error
+        }
     }
 
     // MARK: - Handler: Create Phased Release

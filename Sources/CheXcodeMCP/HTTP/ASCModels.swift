@@ -7,6 +7,13 @@ struct ASCResponse<T: Decodable>: Decodable {
     let included: [ASCIncludedResource]?
 }
 
+/// JSON:API response envelope for single resource that may be null (e.g., unlinked build, missing review detail)
+struct ASCOptionalResponse<T: Decodable>: Decodable {
+    let data: T?
+    let links: ASCPageLinks?
+    let included: [ASCIncludedResource]?
+}
+
 /// JSON:API response envelope for resource list
 struct ASCListResponse<T: Decodable>: Decodable {
     let data: [T]

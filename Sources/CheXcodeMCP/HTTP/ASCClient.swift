@@ -28,6 +28,16 @@ actor ASCClient {
         return try decoder.decode(ASCResponse<T>.self, from: data)
     }
 
+    /// GET request returning a single resource that may be null (e.g., unlinked build)
+    func getOptional<T: Decodable>(
+        path: String,
+        queryItems: [URLQueryItem] = []
+    ) async throws -> T? {
+        let data = try await request(method: "GET", path: path, queryItems: queryItems)
+        let response = try decoder.decode(ASCOptionalResponse<T>.self, from: data)
+        return response.data
+    }
+
     /// GET request returning a list of resources
     func getList<T: Decodable>(
         path: String,
