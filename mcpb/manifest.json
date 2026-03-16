@@ -1,8 +1,8 @@
 {
   "manifest_version": "0.3",
   "name": "che-xcode-mcp",
-  "version": "0.3.0",
-  "description": "Comprehensive App Store Connect MCP Server — TestFlight, analytics, builds, provisioning, Xcode Organizer crash logs, and more",
+  "version": "0.4.0",
+  "description": "App Store Connect + Local Xcode MCP Server — 130 tools: ASC API, TestFlight, builds, provisioning, crash logs, plus local build/deploy/debug",
   "author": {
     "name": "Che Cheng"
   },

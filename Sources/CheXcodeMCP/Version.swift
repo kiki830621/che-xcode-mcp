@@ -2,9 +2,9 @@ import Foundation
 
 /// Centralized version management
 enum AppVersion {
-    static let current = "0.3.0"
+    static let current = "0.4.0"
     static let name = "CheXcodeMCP"
-    static let displayName = "App Store Connect MCP Server"
+    static let displayName = "App Store Connect + Local Xcode MCP Server"
 
     static var versionString: String {
         "\(name) \(current)"
