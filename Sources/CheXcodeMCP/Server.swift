@@ -30,6 +30,7 @@ class CheXcodeMCPServer {
         let gameCenter = GameCenterManager(client: ascClient)
         let appClips = AppClipsManager(client: ascClient)
         let organizerCrash = OrganizerCrashManager()
+        let localXcode = LocalXcodeManager()
 
         // Register providers with their prefix
         providers = [
@@ -49,6 +50,7 @@ class CheXcodeMCPServer {
             "gamecenter": gameCenter,
             "appclip": appClips,
             "organizer": organizerCrash,
+            "local": localXcode,
         ]
 
         // Collect all tools from all providers
@@ -119,6 +121,7 @@ class CheXcodeMCPServer {
     | `gamecenter_` | Game Center | Leaderboards, achievements |
     | `appclip_` | App Clips | Clips, default experiences |
     | `organizer_` | Xcode Organizer crashes | Symbolicated crash logs from local Xcode cache (no API needed) |
+    | `local_` | Local Xcode operations | Build, deploy, device management, diagnostics (no API needed) |
 
     ## Critical Distinctions
 
